@@ -1,0 +1,6 @@
+{
+  "name": "FvgGold AI Trader - Diagnostic & Shared Hosting Suite",
+  "description": "Production-ready architecture, MT5 EA repair, and Python AI service adapted for Windows VPS and Python-compatible shared hosting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

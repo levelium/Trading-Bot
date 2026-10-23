@@ -1,0 +1,24 @@
+# FvgGold AI Trader - Shared Hosting Apache / LiteSpeed Configuration
+
+# 1. Deny public web access to sensitive environment, database, and log files
+<FilesMatch "^\.env|\.sqlite3|\.log$|\.sql$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 2. Options
+Options -Indexes -MultiViews
+
+# 3. Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set Cache-Control "no-store, no-cache, must-revalidate"
+</IfModule>
+
+# 4. Force HTTPS (Uncomment if not handled automatically by cPanel AutoSSL / Cloudflare)
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>

@@ -1,0 +1,4 @@
+.env
+ai_service.log
+__pycache__/
+*.pyc

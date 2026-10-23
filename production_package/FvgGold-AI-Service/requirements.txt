@@ -1,0 +1,8 @@
+# FvgGold AI Trader Python Dependencies
+#
+# Core runtime: ZERO external dependencies required!
+# Uses standard library: json, os, sys, time, threading, logging, urllib, secrets, sqlite3
+#
+# Optional dependencies (install only if using MySQL instead of SQLite):
+# PyMySQL>=1.1.0
+# cryptography>=41.0.0

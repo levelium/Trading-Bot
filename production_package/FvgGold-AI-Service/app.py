@@ -313,13 +313,20 @@ def verify_token(supplied_token: str) -> Tuple[bool, str]:
         return True, ""
     return False, "Unauthorized: Invalid service token provided"
 
-def extract_token_from_headers(headers: Dict[str, str]) -> str:
-    """Extracts token from either X-Service-Token or Authorization: Bearer header."""
+def extract_token_from_headers(headers: Dict[str, str], path: str = "") -> str:
+    """Extracts token from X-Service-Token, Authorization: Bearer, or ?token= / ?key= URL query parameters."""
     token = headers.get('x-service-token', '')
     if not token:
         auth_hdr = headers.get('authorization', '')
         if auth_hdr.lower().startswith('bearer '):
             token = auth_hdr[7:].strip()
+    # Support URL query parameter for simple web browser testing
+    if not token and '?' in path:
+        import urllib.parse
+        qs = urllib.parse.parse_qs(path.split('?', 1)[1])
+        tokens = qs.get('token') or qs.get('key') or []
+        if tokens:
+            token = tokens[0].strip()
     return token.strip()
 
 # --- Core Router Function (Used by both WSGI and Standalone HTTP) ---
@@ -342,7 +349,7 @@ def route_request(method: str, path: str, headers: Dict[str, str], body_bytes: b
         return 200, res
 
     # 2. Authentication Check for All Protected Endpoints
-    supplied_token = extract_token_from_headers(headers)
+    supplied_token = extract_token_from_headers(headers, path)
     is_auth, auth_err = verify_token(supplied_token)
     if not is_auth:
         status_code = 503 if "not configured" in auth_err else 401

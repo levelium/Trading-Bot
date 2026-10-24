@@ -89,7 +89,10 @@ class AuthenticationTests(unittest.TestCase):
         h2 = {'authorization': 'Bearer token-xyz'}
         self.assertEqual(extract_token_from_headers(h2), 'token-xyz')
 
-        # Case 3: Empty headers
+        # Case 3: Query parameter ?token=
+        self.assertEqual(extract_token_from_headers({}, '/status?token=token-query'), 'token-query')
+
+        # Case 4: Empty headers
         self.assertEqual(extract_token_from_headers({}), '')
 
 class EndpointRoutingTests(unittest.TestCase):
@@ -98,6 +101,12 @@ class EndpointRoutingTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(res.get('ok'))
         self.assertEqual(res.get('service'), 'FvgGold AI Trader')
+
+    def test_status_query_param_auth(self):
+        code, res = route_request('GET', f'/status?token={TEST_TOKEN}', {}, b'', '127.0.0.1')
+        self.assertEqual(code, 200)
+        self.assertTrue(res.get('ok'))
+        self.assertEqual(res.get('status'), 'active')
 
     def test_status_unauthenticated_returns_401(self):
         code, res = route_request('GET', '/status', {}, b'', '127.0.0.1')

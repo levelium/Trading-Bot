@@ -206,6 +206,12 @@ class CandidateValidationTests(unittest.TestCase):
         err, _ = validate_candidate(c)
         self.assertIn('spread', err.lower())
 
+    def test_allows_high_spread_when_disabled(self):
+        # When max_spread_points is 0 (disabled), even high weekend spread is allowed
+        c = dict(self.valid_candidate, spread_points=2900.0, max_spread_points=0.0)
+        err, _ = validate_candidate(c)
+        self.assertIsNone(err)
+
     def test_rejects_daily_loss_limit(self):
         c = dict(self.valid_candidate, daily_pl=-50.0, daily_loss_limit=50.0)
         err, _ = validate_candidate(c)

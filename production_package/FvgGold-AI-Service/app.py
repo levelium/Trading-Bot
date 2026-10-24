@@ -285,8 +285,13 @@ def validate_candidate(c: dict) -> Tuple[Optional[str], Optional[str]]:
     if score < min_score:
         return f'FVG score {score:.1f} below configured minimum {min_score:.1f}', None
 
-    max_spread = float(c.get('max_spread_points') or config.MAX_SPREAD_POINTS)
-    if spread > max_spread:
+    max_spread_raw = c.get('max_spread_points')
+    if max_spread_raw is not None and float(max_spread_raw) <= 0:
+        max_spread = 0.0
+    else:
+        max_spread = float(max_spread_raw or config.MAX_SPREAD_POINTS)
+
+    if max_spread > 0 and spread > max_spread:
         return f'Spread {spread:.1f} exceeds allowed limit {max_spread:.1f}', None
 
     daily_limit = float(c.get('daily_loss_limit', 0) or 0)

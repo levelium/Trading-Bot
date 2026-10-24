@@ -147,6 +147,7 @@ class EndpointRoutingTests(unittest.TestCase):
 
 class CandidateValidationTests(unittest.TestCase):
     def setUp(self):
+        import uuid
         self.valid_candidate = {
             'symbol': 'XAUUSD',
             'direction': 'BUY',
@@ -155,6 +156,7 @@ class CandidateValidationTests(unittest.TestCase):
             'take_profit': 2354.0,
             'lot': 0.02,
             'fvg_score': 75.0,
+            'min_score_fvg': 50.0,
             'spread_points': 18.0,
             'max_spread_points': 80.0,
             'equity': 5000.0,
@@ -162,7 +164,8 @@ class CandidateValidationTests(unittest.TestCase):
             'daily_loss_limit': 50.0,
             'risk_percent': 0.20,
             'client_timestamp': int(time.time()),
-            'bar_time': int(time.time()) - 300
+            'bar_time': int(time.time()) - 300,
+            'signal_id': f"sig_test_{uuid.uuid4().hex[:12]}"
         }
 
     def test_valid_candidate_passes(self):
@@ -194,12 +197,12 @@ class CandidateValidationTests(unittest.TestCase):
         self.assertIn('reward-to-risk', err.lower())
 
     def test_rejects_low_fvg_score(self):
-        c = dict(self.valid_candidate, fvg_score=60.0)
+        c = dict(self.valid_candidate, fvg_score=35.0, min_score_fvg=50.0)
         err, _ = validate_candidate(c)
         self.assertIn('score', err.lower())
 
     def test_rejects_high_spread(self):
-        c = dict(self.valid_candidate, spread_points=95.0)
+        c = dict(self.valid_candidate, spread_points=95.0, max_spread_points=80.0)
         err, _ = validate_candidate(c)
         self.assertIn('spread', err.lower())
 

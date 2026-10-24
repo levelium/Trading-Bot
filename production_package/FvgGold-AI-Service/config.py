@@ -61,7 +61,8 @@ GEMINI_KEYS: List[str] = [
 # Risk and filter parameters
 MIN_CONFIDENCE: float = float(os.getenv('MIN_AI_CONFIDENCE', '0.70'))
 MAX_RISK_PERCENT: float = float(os.getenv('MAX_RISK_PERCENT', '0.25'))
-MAX_SPREAD_POINTS: float = float(os.getenv('MAX_SPREAD_POINTS', '80'))
+MAX_SPREAD_POINTS: float = float(os.getenv('MAX_SPREAD_POINTS', '800'))
+MIN_FVG_SCORE: float = float(os.getenv('MIN_FVG_SCORE', '45.0'))
 MAX_REQUEST_DRIFT_SECONDS: int = int(os.getenv('MAX_REQUEST_DRIFT_SECONDS', '60'))
 
 # Telegram configuration (optional)

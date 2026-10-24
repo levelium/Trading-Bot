@@ -129,20 +129,36 @@ def call_gemini(candidate: dict) -> dict:
         raise RuntimeError('No Gemini API keys configured in environment')
     
     system = (
-        'You are a conservative market-setup reviewer for an automated XAUUSD trading system. '
-        'You are not a guaranteed-profitable trader. Review only the supplied candidate and closed-candle arrays; do not invent prices, '
-        'news, candles, or missing indicators. The local EA has already found an FVG candidate. '
-        'Your job is to approve that same direction only when evidence is coherent; otherwise WAIT. '
-        'Never reverse the candidate direction. Prefer WAIT when information is incomplete or conditions are weak. '
-        'Do not recommend increasing risk, averaging down, martingale, or removing a stop loss. '
-        'Return ONLY JSON with keys decision (BUY, SELL, or WAIT), confidence (number 0 to 1), reason (short string), '
-        'and risk_notes (short string).'
+        "You are the senior quantitative market structure analyst for FvgGold AI Trader, "
+        "an institutional-grade automated trading system specialized exclusively in Gold (XAUUSD).\n\n"
+        "=== TRADING STRATEGY TUTORIAL & KNOWLEDGE BASE ===\n"
+        "MODULE 1: MARKET STRUCTURE & TREND ALIGNMENT\n"
+        "- HTF H1 Bias: Bullish when price > 50 EMA > 200 EMA with Higher Highs/Lows. "
+        "Bearish when price < 50 EMA < 200 EMA with Lower Highs/Lows.\n"
+        "- Rule: NEVER approve BUY into established Bearish HTF structure unless confirmed Change of Character (CHoCH) and Break of Structure (BOS).\n"
+        "- Rule: NEVER approve SELL into established Bullish HTF structure.\n\n"
+        "MODULE 2: FAIR VALUE GAPS (FVG)\n"
+        "- 3-Candle Imbalance: Bullish = Candle 1 High < Candle 3 Low. Bearish = Candle 1 Low > Candle 3 High.\n"
+        "- Displacement: Candle 2 must have an expansive body with high volume relative to ATR.\n"
+        "- Mitigation: If price traded past 50% midpoint (Consequent Encroachment), the FVG is mitigated and invalid.\n"
+        "- Premium vs Discount: Bullish entries must be in DISCOUNT (below dealing range equilibrium); Bearish entries in PREMIUM.\n\n"
+        "MODULE 3: ORDER BLOCKS (OB) & LIQUIDITY\n"
+        "- OB: Origin candle before the displacement impulse that formed the FVG.\n"
+        "- Sweeps: Prioritize setups following liquidity sweeps of equal highs (BSL) or equal lows (SSL).\n"
+        "- OB Confluence: FVG overlapping or immediately adjacent to unmitigated OB is high conviction.\n\n"
+        "MODULE 4: ENTRY CONFIRMATION & DECISION LOGIC\n"
+        "- BUY: Proposed direction BUY, HTF Bullish/CHoCH, FVG fresh, Discount zone, R:R >= 1.5.\n"
+        "- SELL: Proposed direction SELL, HTF Bearish/CHoCH, FVG fresh, Premium zone, R:R >= 1.5.\n"
+        "- WAIT: Return WAIT if trend conflicts, spread is wide, momentum wicks are exhausted, or setup is ambiguous.\n\n"
+        "MODULE 5: RISK MANAGEMENT\n"
+        "- Hard cap risk at 0.25% equity. Never widen stop loss. R:R must be >= 1.5.\n"
+        "- Never force trades. Capital preservation is priority #1."
     )
     user = {
         'candidate': candidate,
         'rules': {
-            'minimum_fvg_score': 65,
-            'max_spread_points': config.MAX_SPREAD_POINTS,
+            'minimum_fvg_score': float(candidate.get('fvg_score', 50.0)),
+            'max_spread_points': float(candidate.get('max_spread_points', config.MAX_SPREAD_POINTS)),
             'max_risk_percent': config.MAX_RISK_PERCENT,
             'minimum_reward_to_risk': 1.5,
             'reject_if_daily_loss_limit_hit': True,
@@ -160,11 +176,15 @@ def call_gemini(candidate: dict) -> dict:
                 'type': 'OBJECT',
                 'properties': {
                     'decision': {'type': 'STRING', 'enum': ['BUY', 'SELL', 'WAIT']},
+                    'approved': {'type': 'BOOLEAN'},
                     'confidence': {'type': 'NUMBER'},
+                    'market_bias': {'type': 'STRING', 'enum': ['BULLISH', 'BEARISH', 'NEUTRAL']},
+                    'setup_quality': {'type': 'STRING', 'enum': ['A_PLUS', 'HIGH', 'MEDIUM', 'LOW', 'INVALID']},
                     'reason': {'type': 'STRING'},
-                    'risk_notes': {'type': 'STRING'}
+                    'risk_notes': {'type': 'STRING'},
+                    'invalidation_reason': {'type': 'STRING'}
                 },
-                'required': ['decision', 'confidence', 'reason', 'risk_notes']
+                'required': ['decision', 'approved', 'confidence', 'market_bias', 'setup_quality', 'reason', 'risk_notes', 'invalidation_reason']
             }
         }
     }
@@ -198,9 +218,13 @@ def call_gemini(candidate: dict) -> dict:
                 service_state['last_error'] = None
             return {
                 'decision': decision,
+                'approved': bool(parsed.get('approved', decision == str(candidate.get('direction')).upper() and confidence >= config.MIN_CONFIDENCE)),
                 'confidence': confidence,
-                'reason': str(parsed.get('reason', 'No reason provided'))[:500],
+                'market_bias': str(parsed.get('market_bias', 'NEUTRAL')),
+                'setup_quality': str(parsed.get('setup_quality', 'MEDIUM')),
+                'reason': str(parsed.get('reason', 'Analysis completed'))[:500],
                 'risk_notes': str(parsed.get('risk_notes', ''))[:500],
+                'invalidation_reason': str(parsed.get('invalidation_reason', ''))[:500],
                 'key_slot': idx + 1
             }
         except urllib.error.HTTPError as exc:
@@ -257,10 +281,11 @@ def validate_candidate(c: dict) -> Tuple[Optional[str], Optional[str]]:
     if risk <= 0 or reward / risk < 1.5 - 1e-6:
         return f'Reward-to-risk ratio {reward/risk:.2f} below conservative minimum 1.5', None
 
-    if score < 65:
-        return f'FVG score {score:.1f} below conservative minimum 65', None
+    min_score = float(c.get('min_score_fvg', config.MIN_FVG_SCORE))
+    if score < min_score:
+        return f'FVG score {score:.1f} below configured minimum {min_score:.1f}', None
 
-    max_spread = min(config.MAX_SPREAD_POINTS, float(c.get('max_spread_points', config.MAX_SPREAD_POINTS)))
+    max_spread = float(c.get('max_spread_points') or config.MAX_SPREAD_POINTS)
     if spread > max_spread:
         return f'Spread {spread:.1f} exceeds allowed limit {max_spread:.1f}', None
 
@@ -418,7 +443,10 @@ def route_request(method: str, path: str, headers: Dict[str, str], body_bytes: b
                     'decision': 'WAIT',
                     'approved': False,
                     'confidence': 0.0,
+                    'market_bias': str(body.get('higher_timeframe_bias', 'NEUTRAL')),
+                    'setup_quality': 'INVALID',
                     'reason': validation_error,
+                    'invalidation_reason': validation_error,
                     'risk_notes': 'Local conservative gate rejected candidate',
                     'signal_id': body['signal_id']
                 }
@@ -435,6 +463,9 @@ def route_request(method: str, path: str, headers: Dict[str, str], body_bytes: b
                 confidence = gemini_res['confidence']
                 reason = gemini_res['reason']
                 risk_notes = gemini_res['risk_notes']
+                market_bias = gemini_res.get('market_bias', 'NEUTRAL')
+                setup_quality = gemini_res.get('setup_quality', 'MEDIUM')
+                invalidation_reason = gemini_res.get('invalidation_reason', '')
 
                 # Enforce server-side approval logic
                 approved = (
@@ -448,8 +479,11 @@ def route_request(method: str, path: str, headers: Dict[str, str], body_bytes: b
                     'decision': decision,
                     'approved': bool(approved),
                     'confidence': confidence,
+                    'market_bias': market_bias,
+                    'setup_quality': setup_quality,
                     'reason': reason,
                     'risk_notes': risk_notes,
+                    'invalidation_reason': invalidation_reason,
                     'model': config.MODEL,
                     'key_slot': gemini_res.get('key_slot'),
                     'signal_id': body['signal_id']
